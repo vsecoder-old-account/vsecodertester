@@ -11,13 +11,12 @@ from mod.utils import print_log
 
 # Create server
 app = FastAPI()
-templates = Jinja2Templates('templates')
 
 # Server home page
 @app.get('/')
 def home_page(request: Request):
     print_log(f'"/" - {request.client.host}', 'INFO', 'WEB')
-    return templates.TemplateResponse('index.html', {'request': request})
+    return 'index'
 
 # Server api page
 @app.get('/api/py')
