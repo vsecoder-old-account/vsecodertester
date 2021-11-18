@@ -5,11 +5,12 @@ from mod.utils import print_log
 
 class API():
     def create_docker():
-        return subprocess.run(
+        print('Creating...') 
+        print(subprocess.run(
             'docker build -t "app:worker" .', 
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
             shell=True, check=True
-        ).stdout.decode('utf-8')
+        ).stdout.decode('utf-8'))
 
     def kill(name, t):
         time.sleep(t)
