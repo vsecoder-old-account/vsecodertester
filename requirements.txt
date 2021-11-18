@@ -5,3 +5,4 @@ requests
 uvicorn
 jinja2
 sqlalchemy
+memory_profiler
