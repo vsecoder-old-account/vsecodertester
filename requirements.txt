@@ -1,8 +1,5 @@
-werkzeug
-fastapi
-gunicorn
 requests
-uvicorn
-jinja2
-sqlalchemy
-memory_profiler
+requests_unixsocket
+prettytable
+fuzzywuzzy
+python-aalib

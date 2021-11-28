@@ -11,24 +11,18 @@ from mod.utils import print_log
 
 # Create server
 app = FastAPI()
+templates = Jinja2Templates('templates')
 
 # Server home page
 @app.get('/')
 def home_page(request: Request):
     print_log(f'"/" - {request.client.host}', 'INFO', 'WEB')
-    return 'index'
+    return templates.TemplateResponse('index.html', {'request': request})
 
-# Server api page
-@app.get('/api/py')
-def api_page(request: Request, code='print("Hello, world!")'):
-    print_log(f'"/api/py" - {request.client.host}', 'INFO', 'WEB')
-    return API.start(code, 'py')
-
-# Server api page
-@app.get('/api/js')
-def api_page1(request: Request, code='console.log("Hello, world!")'):
-    print_log(f'"/api/js" - {request.client.host}', 'INFO', 'WEB')
-    return API.start(code, 'js')
+# Create server
+@app.get('/create')
+def api_page(request: Request):
+    return API.create()
 
 # Start server
 if __name__ == "__main__":

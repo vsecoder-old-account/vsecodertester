@@ -1,8 +1,16 @@
 FROM python:3
 
+COPY requirements.txt .
+
 RUN pip install --upgrade pip && \
-    pip install requests
+    pip install -r requirements.txt
 
-FROM node:12.18.1
+RUN useradd user
 
-RUN npm install
+USER user
+
+WORKDIR /vsecoder
+
+COPY developer.txt .
+COPY start.py .
+COPY img.jpg .
