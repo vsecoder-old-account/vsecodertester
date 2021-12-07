@@ -64,7 +64,7 @@ class API():
         }
         try:
             command = {
-                "py": "python -c",
+                "py": "python3 -c",
                 "js": "node -e",
                 "bash": ""
             }
@@ -74,8 +74,9 @@ class API():
             print_log(f'docker run --name {name} --rm -m {memory}m --cpus={cpus} -it app:start {command[lang]} "{code}"', 'INFO', 'DOCKER')
             start_time = time.time()
             old_memory = memory_usage()[0]
+            #  --network none
             json['result'] = subprocess.run(
-                f'docker run --name {name} --rm -m {memory}m --cpus={cpus} -it --network none app:worker {command[lang]} "{code}"', 
+                f'docker run --name {name} --rm -m {memory}m --cpus={cpus} -it app:worker {command[lang]} "{code}"', 
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
                 shell=True, check=True, timeout=t+5
             ).stdout.decode('utf-8')

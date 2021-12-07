@@ -21,6 +21,7 @@ from aiogram.contrib.middlewares.logging import LoggingMiddleware
 from mod.api import API
 from PIL import Image, ImageDraw, ImageFont
 import random, os, textwrap
+from mod.data import stat
 
 work = 0
 font = ImageFont.truetype("files/JetBrainsMono-Bold.ttf", 16, encoding="unic")
@@ -69,17 +70,60 @@ async def send_stop(message: types.Message):
 async def send_work(message: types.Message):
 	await message.reply(f'Work {work}', parse_mode='html')
 
+# /stat
+@dp.message_handler(commands=['stat'])
+async def send_stat(message: types.Message):
+	pc = stat()
+	await message.reply(f'''
+{pc["status"]["cpu"]} <b>CPU:</b> <code>{pc['cpu']['used']} / {pc['cpu']['total']}</code> <i>({pc["cpu"]["percent"]}%)</i>
+{pc["status"]["memory"]} <b>Memory:</b> <code>{pc['memory']['used']} MiB /{pc['memory']['total']} MiB</code> <i>({pc["memory"]["percent"]}%)</i>
+{pc["status"]["disk"]} <b>Disk: </b> <code>{pc['disk']['used']} MiB /{pc['disk']['total']} MiB</code> <i>({pc["disk"]["percent"]}%)</i>
+''', parse_mode='html')
+
 @dp.message_handler(content_types=["text"])
 @dp.throttled(anti_flood, rate=5)
 async def check(message: types.Message):
 	global work
 	try:
 		work += 1
+		res = API.start(message.text, 'py')
+		if res["result"]:
+			work -= 1
 		if work <= 20:
-			res = API.start(message.text, 'py')
-			if res["result"]:
-				work -= 1
-			print(f'{res["code"]} - {message.from_user.id}')
+			print(f'{res["code"]} - @{message.from_user.username}')
+			string = f'<code>{res["code"].replace("<", "&lt;")}</code>\n\n<b>Result:</b>\n<code>{res["result"].replace("<", "&lt;")}</code>\n<b>Usage:</b>\n 💽 <b>Memory:</b> {res["usage"]["memory"]} / {res["max"]["memory"]}\n 🕐 <b>Time:</b> {res["usage"]["time"]} / {res["max"]["time"]}'
+			#leng = 3000
+			#if len(string) < 3000: leng = len(string)
+			#num = random.randrange(1, 999999999999999)
+			#image = Image.new("RGB", (1000, 800), "#2c0821")
+			#draw = ImageDraw.Draw(image)
+			#draw.text((10, 5), "vsecodertester", fill='#7fc930', font=font)
+			#draw.text((150, 5), ":", fill='white', font=font)
+			#draw.text((165, 5), "~", fill='#617aa5', font=font)
+			#draw.text((185, 5), "$ python script.py", fill='white', font=font)
+			#y = 25
+			#m = 0
+			#for text in res["result"][0:leng].split('\n'):
+			#	ress = ''
+			#	text = textwrap.wrap(text, width=100)
+			#	for t in text:
+			#		ress += t + '\n'
+			#		m += 20
+			#	draw.text((10, y), f'{ress}', fill='white', font=font)
+			#	y += m
+			#	m = 0
+			#print(res["status"])
+			#if res["usage"]["memory"] == '... MiB':
+			#	draw.text((500, 5), "^C", fill='red', font=font)
+			#image.save(f'{num}.png')
+			#string = f'<code>{res["code"].replace("<", "&lt;")}</code>\n\n<b>Result:</b> Look up =)\n\n<b>Usage:</b>\n 💽 <b>Memory:</b> {res["usage"]["memory"]} / {res["max"]["memory"]}\n 🕐 <b>Time:</b> {res["usage"]["time"]} / {res["max"]["time"]}'
+			#await bot.send_photo(message.chat.id, open(f'{num}.png', 'rb'), caption=string, parse_mode="html")
+			#os.remove(f'{num}.png')
+			await bot.send_message(message.chat.id, string, parse_mode="html")
+		else:
+			await message.reply('😔 Больше 20 процессов выполняется на сервере, пожалуйста попробуйте позже!')
+	except Exception as e:
+		try:
 			string = f'<code>{res["code"].replace("<", "&lt;")}</code>\n\n<b>Result:</b>\n<code>{res["result"].replace("<", "&lt;")}</code>\n<b>Usage:</b>\n 💽 <b>Memory:</b> {res["usage"]["memory"]} / {res["max"]["memory"]}\n 🕐 <b>Time:</b> {res["usage"]["time"]} / {res["max"]["time"]}'
 			leng = 3000
 			if len(string) < 3000: leng = len(string)
@@ -105,14 +149,11 @@ async def check(message: types.Message):
 			if res["usage"]["memory"] == '... MiB':
 				draw.text((500, 5), "^C", fill='red', font=font)
 			image.save(f'{num}.png')
-			string = f'<code>{res["code"].replace("<", "&lt;")}</code>\n\n<b>Result:</b> Look up =)\n\n<b>Usage:</b>\n 💽 <b>Memory:</b> {res["usage"]["memory"]} / {res["max"]["memory"]}\n 🕐 <b>Time:</b> {res["usage"]["time"]} / {res["max"]["time"]}'
+			string = f'<code>{res["code"].replace("<", "&lt;")}</code>\n\n<b>Usage:</b>\n 💽 <b>Memory:</b> {res["usage"]["memory"]} / {res["max"]["memory"]}\n 🕐 <b>Time:</b> {res["usage"]["time"]} / {res["max"]["time"]}'
 			await bot.send_photo(message.chat.id, open(f'{num}.png', 'rb'), caption=string, parse_mode="html")
 			os.remove(f'{num}.png')
-		else:
-			await message.reply('😔 Больше 20 процессов выполняется на сервере, пожалуйста попробуйте позже!')
-	except Exception as e:
-		print(e)
-		await message.reply('😔 Результат слишком велик, телеграм не разрешил отправить столько текста!')
+		except:
+			await bot.send_message(message.chat.id, 'Не получилось отправить результат, он слишком большой, а боту не разрешено отправлять фото\n------------------------------------------\nIt was not possible to send the result, it is too big, and the bot is not allowed to send photos', parse_mode="html")
 
 if __name__ == "__main__":
 	executor.start_polling(dp)
