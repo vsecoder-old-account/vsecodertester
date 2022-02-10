@@ -48,7 +48,7 @@ class API():
             except:
                 pass
         if mem != 0: mem = int(mem)/8984
-        return {"cpu": cpu, "mem": mem}
+        return {"cpu": cpu, "mem": mem} 
 
     def start(code, memory=512, cpus=1, t=5):
         name = random.randrange(1, 999999999999999)
@@ -91,11 +91,11 @@ class API():
 
             json['usage']['time'] = f'{time.time() - start_time}s'
 
-            #beta
-            #stat = stats.join()
+            # beta
+            #stat = stats.join() # возвращает почему-то None...
             #print(stats.join())
             #json['usage']['memory'] = f'{stat["mem"]}Mib'
-            #json['usage']['CPUS'] = f'{stat["cpu"]}Mib'
+            #json['usage']['CPUS'] = f'{stat["cpu"]}'
 
             # статус(чтобы понять что убито выполнение кода)
             json['status'] = f'{kill.join()}'
