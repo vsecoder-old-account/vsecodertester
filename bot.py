@@ -54,22 +54,6 @@ async def send_libs(message: types.Message):
 	await message.reply(f'🐍 <b>requirements.txt</b>\n{f.read()}', parse_mode='html')
 	f.close()
 
-# /check
-@dp.message_handler(commands=['check'])
-async def send_check(message: types.Message):
-	await message.reply(f'<code>{API.stats().replace("<", "&lt;")}</code>', parse_mode='html')
-
-# /stop
-@dp.message_handler(commands=['stop'])
-async def send_stop(message: types.Message):
-	API.kill(message.text.split()[1], 1)
-	await message.reply(f'Stopped {message.text.split()[1]}', parse_mode='html')
-
-# /work
-@dp.message_handler(commands=['work'])
-async def send_work(message: types.Message):
-	await message.reply(f'Work {work}', parse_mode='html')
-
 # /stat
 @dp.message_handler(commands=['stat'])
 async def send_stat(message: types.Message):
