@@ -1,6 +1,6 @@
 import docker, random, time
 from threading import Thread
-#from utils import print_log
+import concurrent.futures
 
 client = docker.from_env()
 
@@ -10,7 +10,7 @@ class API():
         pass
 
     def kill(server, t):
-        time.sleep(t-2)
+        time.sleep(t)
         #server = server
         server.stop()
         server.remove()
@@ -24,7 +24,7 @@ class API():
         except:
             pass
 
-    def stats(name,t):
+    def stats(name, t):
         # beta
         cpu = 0
         mem = 0
@@ -42,16 +42,17 @@ class API():
                     if mem < new_mem:
                         mem = new_mem
             except docker.errors.APIError:
-                break
+                if mem != 0: mem = int(mem)/8984
+                return {"cpu": cpu, "mem": mem} 
             except docker.errors.NotFound:
-                break
+                if mem != 0: mem = int(mem)/8984
+                return {"cpu": cpu, "mem": mem} 
             except:
                 pass
-        if mem != 0: mem = int(mem)/8984
-        return {"cpu": cpu, "mem": mem} 
 
-    def start(code, memory=512, cpus=1, t=5):
+    def start(code, memory=512, cpus=1, network_disabled=True, t=5):
         name = random.randrange(1, 999999999999999)
+        # шаблон результата
         json = {
             "id": name,
             "code": code,
@@ -72,30 +73,34 @@ class API():
             code = code.replace('"', '\\"')
             
             start_time = time.time()
-
+            
+            # https://docker-py.readthedocs.io/en/stable/containers.html
             server = client.containers.run(
                 "app:worker",
                 f'python3 -c "{code}"',
                 name=name,
                 detach=True,
                 mem_limit=f"{memory}m",
+                network_disabled=network_disabled,
                 cpu_count=cpus
             )
+
+            # отвечает за убийство процесса в случаи долгого выполнения
             kill = Thread(target=API.kill, args=(server,t))
             kill.start()
-            #stats = Thread(target=API.stats, args=(name,t))
-            #stats.start()
 
-            #timestamps=True, 
+            #timestamps=True, - можно добавить для тайм кодов в результате
             json['result'] = str(server.logs(tail=0, follow=True), 'UTF-8')
 
+            # время выполнения
             json['usage']['time'] = f'{time.time() - start_time}s'
 
             # beta
-            #stat = stats.join() # возвращает почему-то None...
-            #print(stats.join())
-            #json['usage']['memory'] = f'{stat["mem"]}Mib'
-            #json['usage']['CPUS'] = f'{stat["cpu"]}'
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(API.stats, name, t)
+                return_value = future.result()
+                json['usage']['memory'] = f'{return_value["mem"]}Mib'
+                json['usage']['CPUS'] = f'{return_value["cpu"]}'
 
             # статус(чтобы понять что убито выполнение кода)
             json['status'] = f'{kill.join()}'
@@ -109,4 +114,31 @@ class API():
                 API.clear(name)
             return json
 
-print(API.start('print(1)'))
+print(
+    API.start(
+        'for i in range(1, 200): print(1)', # python code(str)
+        memory=512,                         # память(в МБ) максимально доступная для выполнения(int)
+        cpus=1,                             # кол-во ядер для выполнения(int)
+        network_disabled=False,             # блокировка интернета (bool)
+        t=5                                 # максимальное среднее время выполнения(int)
+    )
+)
+
+# result =>
+
+#{
+#    'id': 534403284476367,            -- id
+#    'code': 'print(1)',               -- python code
+#    'result': '1\n',                  -- result
+#    'status': 'None',                 -- status(if stopped - process killed)
+#    'max': {                          -- limitations
+#        'memory': '512MiB', 
+#        'CPUS': '1', 
+#        'time': '5s'
+#    }, 
+#    'usage': {
+#        'memory': '0Mib',             -- usage peak (> 1 MB)
+#        'CPUS': '0',                  -- usage peak (> 1)
+#        'time': '0.6736643314361572s' -- execution time
+#    }
+#}

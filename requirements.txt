@@ -1,0 +1,6 @@
+docker
+requests
+requests_unixsocket
+prettytable
+fuzzywuzzy
+python-aalib
