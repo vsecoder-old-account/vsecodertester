@@ -1,51 +1,58 @@
-from memory_profiler import memory_usage
-import subprocess, random, time
+import docker, random, time
 from threading import Thread
-from mod.utils import print_log
+import concurrent.futures
+
+client = docker.from_env()
 
 class API():
     def create_docker():
-        return subprocess.run(
-            'docker build -t "app:worker" .', 
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
-            shell=True, check=True
-        ).stdout.decode('utf-8')
+        # docker build -t "app:worker" .
+        pass
 
-    def kill(name, t):
-        time.sleep(t-2)
-        try:
-            res = subprocess.run(
-                f'docker kill {name}', 
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
-                shell=True, check=True
-            ).stdout.decode('utf-8')
-            return 'stopped'
-        except Exception as e:
-            print(e)
-            return ''
+    def kill(server, t):
+        time.sleep(t)
+        #server = server
+        server.stop()
+        server.remove()
+        return 'stopped'
 
-    def clear():
+    def clear(name):
         try:
-            subprocess.run(
-                f'docker image prune', 
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
-                shell=True, check=True
-            ).stdout.decode('utf-8')
+            server = client.containers.get(str(name))
+            server.stop()
+            server.remove()
         except:
             pass
 
-    def stats():
-        try:
-            return subprocess.run(
-                f'docker stats --no-stream', 
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
-                shell=True, check=True
-            ).stdout.decode('utf-8')
-        except:
-            return 'error'
+    def stats(name, t):
+        # beta
+        cpu = 0
+        mem = 0
+        server = client.containers.get(str(name))
+        while True:
+            try:
+                new_cpu = server.stats(stream=False)['cpu_stats']['cpu_usage']['total_usage']
+                #print(new_cpu)
+                if new_cpu != {}:
+                    if cpu < new_cpu:
+                        cpu = new_cpu
+                new_mem = server.stats(stream=False)['memory_stats']['usage']
+                #print(new_mem)
+                if new_mem != {}:
+                    if mem < new_mem:
+                        mem = new_mem
+            except docker.errors.APIError:
+                if mem != 0: mem = int(mem)/8984
+                return {"cpu": cpu, "mem": mem} 
+            except docker.errors.NotFound:
+                if mem != 0: mem = int(mem)/8984
+                return {"cpu": cpu, "mem": mem} 
+            except:
+                pass
 
-    def start(code, lang, memory=50, cpus=0.1, t=5):
+    def start(code, memory=512, cpus=1, network_disabled=True, t=5):
         name = random.randrange(1, 999999999999999)
+        # шаблон результата
         json = {
             "id": name,
             "code": code,
@@ -57,45 +64,52 @@ class API():
                 "time": f"{t}s"
             },
             "usage": {
-                "memory": '... MiB',
+                "memory": '... MiB', # peak
                 "CPUS": '...',
                 "time": '... s'
             }
         }
         try:
-            command = {
-                "py": "python3 -c",
-                "js": "node -e",
-                "bash": ""
-            }
             code = code.replace('"', '\\"')
-            timeout = Thread(target=API.kill, args=(name,t))
-            timeout.start()
-            print_log(f'docker run --name {name} --rm -m {memory}m --cpus={cpus} -it app:start {command[lang]} "{code}"', 'INFO', 'DOCKER')
+            
             start_time = time.time()
-            old_memory = memory_usage()[0]
-            #  --network none
-            json['result'] = subprocess.run(
-                f'docker run --name {name} --rm -m {memory}m --cpus={cpus} -it app:worker {command[lang]} "{code}"', 
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
-                shell=True, check=True, timeout=t+5
-            ).stdout.decode('utf-8')
+            
+            # https://docker-py.readthedocs.io/en/stable/containers.html
+            server = client.containers.run(
+                "app:worker",
+                f'python3 -c "{code}"',
+                name=name,
+                detach=True,
+                mem_limit=f"{memory}m",
+                network_disabled=network_disabled,
+                cpu_count=cpus
+            )
+
+            # отвечает за убийство процесса в случаи долгого выполнения
+            kill = Thread(target=API.kill, args=(server,t))
+            kill.start()
+
+            #timestamps=True, - можно добавить для тайм кодов в результате
+            json['result'] = str(server.logs(tail=0, follow=True), 'UTF-8')
+
+            # время выполнения
             json['usage']['time'] = f'{time.time() - start_time}s'
-            json['usage']['memory'] = f'{memory_usage()[0] - old_memory}Mib'
-            json['status'] = f'{timeout.join()}'
-            return json
-        except subprocess.CalledProcessError as e:
-            json['result'] = str(e.output, 'UTF-8')
-            print_log(json, 'INFO', 'DOCKER')
+
+            # beta
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(API.stats, name, t)
+                return_value = future.result()
+                json['usage']['memory'] = f'{return_value["mem"]}Mib'
+                json['usage']['CPUS'] = f'{return_value["cpu"]}'
+
+            # статус(чтобы понять что убито выполнение кода)
+            json['status'] = f'{kill.join()}'
             return json
         except Exception as e:
+            print(e)
             try:
-                json['result'] = str(e.output, 'UTF-8')
+                json['result'] = str(server.logs(tail=0, follow=True), 'UTF-8')
             except:
                 json['result'] = 'Omg... This code has not been run!'
-                API.clear()
-            if str(e)[:19] == f"Command 'docker run":
-                json['result'] =  f'Code stoped after {t} seconds!'
-                json['usage']['time'] = f'{t}s'
-            print_log(json, 'INFO', 'DOCKER')
+                API.clear(name)
             return json
