@@ -21,7 +21,7 @@ docker build -t "app:worker" .
 ```python
 print(
     API.start(
-        'for i in range(1, 200): print(1)', # python code(str)
+        'print(1)', # python code(str)
         memory=512,                         # память(в МБ) максимально доступная для выполнения(int)
         cpus=1,                             # кол-во ядер для выполнения(int)
         network_disabled=False,             # блокировка интернета (bool)
